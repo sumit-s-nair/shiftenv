@@ -1,0 +1,4 @@
+openenv-corep
+pytest
+requests
+httpx

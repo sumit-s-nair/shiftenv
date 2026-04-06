@@ -177,7 +177,7 @@ def grapher(TARGET_FOLDER, TARGET_LIBRARY):
     export_graph(G, "dependency_graph.graphml")
 
 
-    export_migration_json(G, library_calls_map, "ordered_notes.json")
+    export_migration_json(G, library_calls_map, "migration_plan.json")
 
 
 TARGET_FOLDER = "./test_folder" 

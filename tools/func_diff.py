@@ -54,16 +54,35 @@ def get_func_info(lib: str, func_path: str) -> dict[str, Any]:
         }
 
 
+def _strip_lib_prefix(lib: str, func_path: str) -> str:
+    """
+    Strip the library prefix from a function path if the agent included it.
+    e.g. "httpx.get" with lib="httpx" → "get"
+         "httpx.Client.get" with lib="httpx" → "Client.get"
+         "nn.Linear" with lib="torch" → "nn.Linear" (no prefix match)
+    """
+    prefix = lib + "."
+    if func_path.startswith(prefix):
+        return func_path[len(prefix):]
+    return func_path
+
+
 def get_func_diff(old_lib: str, new_lib: str, func_path: str, new_func_path: str | None = None) -> dict[str, Any]:
     """
     Compare a function between old and new library.
     new_func_path handles renames e.g. requests.Session -> httpx.Client
+
+    Automatically strips library prefix from paths so the agent can pass
+    either "httpx.get" or just "get" — both work correctly.
     """
-    old_info = get_func_info(old_lib, func_path)
-    new_info = get_func_info(new_lib, new_func_path or func_path)
+    clean_old_func = _strip_lib_prefix(old_lib, func_path)
+    clean_new_func = _strip_lib_prefix(new_lib, new_func_path) if new_func_path else clean_old_func
+
+    old_info = get_func_info(old_lib, clean_old_func)
+    new_info = get_func_info(new_lib, clean_new_func)
 
     if not new_info["found"]:
-        new_info["note"] = f"'{new_func_path or func_path}' not found in {new_lib} — may be renamed, check mappings.py"
+        new_info["note"] = f"'{clean_new_func}' not found in {new_lib} — may be a response method (not top-level), or renamed. Use it as response.{clean_new_func}() in your code."
 
     return {
         "old": old_info,

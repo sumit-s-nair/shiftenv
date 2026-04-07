@@ -1,44 +1,44 @@
 <?xml version='1.0' encoding='utf-8'?>
 <graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
   <graph edgedefault="directed">
-    <node id="formatter.py:format_user_info" />
-    <node id="main.py:main" />
-    <node id="test2\test.py:quick_ping" />
-    <node id="test2\test.py:update_settings" />
-    <node id="test2\test.py:full_system_init" />
-    <node id="api.py:fetch_user_data" />
-    <node id="test2\test.py:sync_account" />
-    <node id="test2\test.py:validate_payload" />
-    <node id="test2\test.py:fetch_user_profile" />
+    <node id="test2/test.py:update_settings" />
+    <node id="test2/test.py:build_api_url" />
+    <node id="test2/test.py:fetch_user_profile" />
+    <node id="test2/test.py:sync_account" />
     <node id="processing.py:extract_email" />
-    <node id="processing.py:extract_username" />
-    <node id="test2\test.py:build_api_url" />
-    <node id="test2\test.py:log_error" />
-    <node id="utils.py:build_headers" />
-    <node id="test2\test.py:get_standard_headers" />
-    <node id="test2\test.py:submit_transaction" />
-    <node id="test2\test.py:maintenance_check" />
+    <node id="test2/test.py:full_system_init" />
+    <node id="main.py:main" />
+    <node id="test2/test.py:log_error" />
+    <node id="test2/test.py:submit_transaction" />
+    <node id="test2/test.py:quick_ping" />
     <node id="utils.py:build_url" />
-    <edge source="formatter.py:format_user_info" target="processing.py:extract_username" />
-    <edge source="formatter.py:format_user_info" target="processing.py:extract_email" />
+    <node id="processing.py:extract_username" />
+    <node id="utils.py:build_headers" />
+    <node id="test2/test.py:validate_payload" />
+    <node id="test2/test.py:maintenance_check" />
+    <node id="test2/test.py:get_standard_headers" />
+    <node id="api.py:fetch_user_data" />
+    <node id="formatter.py:format_user_info" />
+    <edge source="test2/test.py:update_settings" target="test2/test.py:build_api_url" />
+    <edge source="test2/test.py:update_settings" target="test2/test.py:get_standard_headers" />
+    <edge source="test2/test.py:fetch_user_profile" target="test2/test.py:build_api_url" />
+    <edge source="test2/test.py:fetch_user_profile" target="test2/test.py:get_standard_headers" />
+    <edge source="test2/test.py:sync_account" target="test2/test.py:fetch_user_profile" />
+    <edge source="test2/test.py:sync_account" target="test2/test.py:submit_transaction" />
+    <edge source="processing.py:extract_email" target="api.py:fetch_user_data" />
+    <edge source="test2/test.py:full_system_init" target="test2/test.py:maintenance_check" />
+    <edge source="test2/test.py:full_system_init" target="test2/test.py:update_settings" />
+    <edge source="test2/test.py:full_system_init" target="test2/test.py:sync_account" />
     <edge source="main.py:main" target="formatter.py:format_user_info" />
-    <edge source="test2\test.py:update_settings" target="test2\test.py:build_api_url" />
-    <edge source="test2\test.py:update_settings" target="test2\test.py:get_standard_headers" />
-    <edge source="test2\test.py:full_system_init" target="test2\test.py:maintenance_check" />
-    <edge source="test2\test.py:full_system_init" target="test2\test.py:update_settings" />
-    <edge source="test2\test.py:full_system_init" target="test2\test.py:sync_account" />
+    <edge source="test2/test.py:submit_transaction" target="test2/test.py:validate_payload" />
+    <edge source="test2/test.py:submit_transaction" target="test2/test.py:log_error" />
+    <edge source="test2/test.py:submit_transaction" target="test2/test.py:build_api_url" />
+    <edge source="processing.py:extract_username" target="api.py:fetch_user_data" />
+    <edge source="test2/test.py:maintenance_check" target="test2/test.py:quick_ping" />
+    <edge source="test2/test.py:maintenance_check" target="test2/test.py:log_error" />
     <edge source="api.py:fetch_user_data" target="utils.py:build_url" />
     <edge source="api.py:fetch_user_data" target="utils.py:build_headers" />
-    <edge source="test2\test.py:sync_account" target="test2\test.py:fetch_user_profile" />
-    <edge source="test2\test.py:sync_account" target="test2\test.py:submit_transaction" />
-    <edge source="test2\test.py:fetch_user_profile" target="test2\test.py:build_api_url" />
-    <edge source="test2\test.py:fetch_user_profile" target="test2\test.py:get_standard_headers" />
-    <edge source="processing.py:extract_email" target="api.py:fetch_user_data" />
-    <edge source="processing.py:extract_username" target="api.py:fetch_user_data" />
-    <edge source="test2\test.py:submit_transaction" target="test2\test.py:validate_payload" />
-    <edge source="test2\test.py:submit_transaction" target="test2\test.py:log_error" />
-    <edge source="test2\test.py:submit_transaction" target="test2\test.py:build_api_url" />
-    <edge source="test2\test.py:maintenance_check" target="test2\test.py:quick_ping" />
-    <edge source="test2\test.py:maintenance_check" target="test2\test.py:log_error" />
+    <edge source="formatter.py:format_user_info" target="processing.py:extract_username" />
+    <edge source="formatter.py:format_user_info" target="processing.py:extract_email" />
   </graph>
 </graphml>

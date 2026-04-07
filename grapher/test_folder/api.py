@@ -1,8 +1,5 @@
 # api.py
-
-import requests
-
-
+import httpx as requests
 def fetch_user_data(user_id, token):
     from utils import build_url, build_headers
 

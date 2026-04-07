@@ -7,7 +7,7 @@ import re
 import shutil
 import uuid
 from typing import Tuple, Dict, Any
-
+from flask import Flask, request, jsonify
 from pydantic import BaseModel, Field
 
 from tools.sandbox import run_tests
@@ -330,3 +330,74 @@ class MigrationEnv:
         """Remove the working directory."""
         if self._work_dir and os.path.exists(self._work_dir):
             shutil.rmtree(self._work_dir, ignore_errors=True)
+
+
+app = Flask(__name__)
+
+# Instantiate a single global environment for the container runtime
+env = MigrationEnv()
+
+@app.route("/", methods=["GET", "POST"])
+def ping():
+    """
+    Automated ping to the Space URL.
+    Must return 200 OK.
+    """
+    return jsonify({"status": "ok", "message": "ShiftEnv space is running"}), 200
+
+@app.route("/reset", methods=["POST"])
+def reset():
+    """
+    OpenEnv /reset endpoint.
+    Accepts an optional JSON payload to specify the task_name.
+    """
+    data = request.get_json(silent=True) or {}
+    task_name = data.get("task_name")
+    
+    # Call the underlying environment reset
+    obs = env.reset(task_name=task_name)
+    
+    # Pydantic v2 uses model_dump(), for v1 use .dict()
+    return jsonify(obs.model_dump()), 200
+
+@app.route("/step", methods=["POST"])
+def step():
+    """
+    OpenEnv /step endpoint.
+    Accepts a JSON payload matching the MigrationAction schema.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON payload provided"}), 400
+        
+    try:
+        # Validate incoming data using the Pydantic model
+        action = MigrationAction(**data)
+    except Exception as e:
+        return jsonify({"error": "Invalid action format", "details": str(e)}), 400
+
+    # Execute the step
+    obs, reward, done, info = env.step(action)
+    
+    # Return the combined result expected by OpenEnv
+    return jsonify({
+        "observation": obs.model_dump(),
+        "reward": reward,
+        "done": done,
+        "info": info
+    }), 200
+
+@app.route("/state", methods=["GET"])
+def state():
+    """
+    OpenEnv /state endpoint.
+    Returns the current episode metadata.
+    """
+    current_state = env.state
+    return jsonify(current_state.model_dump()), 200
+
+if __name__ == "__main__":
+    # Run on 0.0.0.0 to expose it properly in Docker/HF Spaces
+    # Hugging Face Spaces default port is usually 7860
+    port = int(os.environ.get("PORT", 7860))
+    app.run(host="0.0.0.0", port=port)

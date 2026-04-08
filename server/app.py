@@ -397,7 +397,6 @@ def state():
     return jsonify(current_state.model_dump()), 200
 
 if __name__ == "__main__":
-    # Run on 0.0.0.0 to expose it properly in Docker/HF Spaces
-    # Hugging Face Spaces default port is usually 7860
+
     port = int(os.environ.get("PORT", 7860))
     app.run(host="0.0.0.0", port=port)

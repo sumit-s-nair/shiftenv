@@ -73,10 +73,16 @@ TASK_CONFIG = {
 # ---------------------------------------------------------
 # 3. Reward Helpers
 # ---------------------------------------------------------
+def _clamp_score(raw_score: float) -> float:
+    # Keep reward components strictly inside (0, 1).
+    score = max(0.01, min(0.99, raw_score))
+    return score
+
+
 def _check_imports(repo_path: str, old_lib: str) -> float:
     """
-    Returns 1.0 if old library is completely gone from repo's .py files.
-    Returns 0.0 if any file still imports it.
+    Returns a clamped score near 1.0 if old imports are gone.
+    Returns a clamped score near 0.0 if any old import remains.
     """
     for root, _, files in os.walk(repo_path):
         for fname in files:
@@ -87,10 +93,10 @@ def _check_imports(repo_path: str, old_lib: str) -> float:
                 with open(fpath, "r") as f:
                     content = f.read()
                 if re.search(rf"\bimport\s+{re.escape(old_lib)}\b|from\s+{re.escape(old_lib)}\b", content):
-                    return 0.0
+                    return _clamp_score(0.0)
             except Exception:
                 continue
-    return 1.0
+    return _clamp_score(1.0)
 
 
 def _compute_reward(test_score: float, repo_path: str, old_lib: str,
@@ -103,7 +109,9 @@ def _compute_reward(test_score: float, repo_path: str, old_lib: str,
     """
     import_score = _check_imports(repo_path, old_lib)
     step_penalty = 0.01 * (current_step / max_steps) if max_steps > 0 else 0
-    return round(0.7 * test_score + 0.3 * import_score - step_penalty, 4)
+    raw_score = 0.7 * test_score + 0.3 * import_score - step_penalty
+    score = _clamp_score(raw_score)
+    return round(score, 4)
 
 
 # ---------------------------------------------------------

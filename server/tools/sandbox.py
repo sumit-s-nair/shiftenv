@@ -14,6 +14,12 @@ BLOCKED_LIBS = {
 }
 
 
+def _clamp_score(raw_score: float) -> float:
+    # Keep grader outputs strictly inside (0, 1).
+    score = max(0.01, min(0.99, raw_score))
+    return score
+
+
 def is_installed(lib: str) -> bool:
     """Check if a library is importable in the current environment."""
     return importlib.util.find_spec(lib) is not None
@@ -79,7 +85,7 @@ def run_tests(test_dir: str, repo_dir: str | None = None) -> dict[str, Any]:
         repo_dir: Working directory for pytest (defaults to test_dir parent).
 
     Returns:
-        Dict with keys: passed, failed, errors, total, score (0.0-1.0), output.
+        Dict with keys: passed, failed, errors, total, score (0.01-0.99), output.
     """
     cwd = repo_dir or test_dir
     try:
@@ -103,7 +109,8 @@ def run_tests(test_dir: str, repo_dir: str | None = None) -> dict[str, Any]:
         errors = int(error_match.group(1)) if error_match else 0
 
         total = passed + failed + errors
-        score = passed / total if total > 0 else 0.0
+        raw_score = passed / total if total > 0 else 0.0
+        score = _clamp_score(raw_score)
 
         return {
             "passed": passed,
@@ -119,7 +126,7 @@ def run_tests(test_dir: str, repo_dir: str | None = None) -> dict[str, Any]:
             "failed": 0,
             "errors": 1,
             "total": 1,
-            "score": 0.0,
+            "score": _clamp_score(0.0),
             "output": "pytest timed out after 120s",
         }
     except Exception as e:
@@ -128,6 +135,6 @@ def run_tests(test_dir: str, repo_dir: str | None = None) -> dict[str, Any]:
             "failed": 0,
             "errors": 1,
             "total": 1,
-            "score": 0.0,
+            "score": _clamp_score(0.0),
             "output": str(e),
         }

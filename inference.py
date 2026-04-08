@@ -223,8 +223,9 @@ def run_agent():
                 {"role": "user", "content": f"Migrate `{file_path}` from `{state.old_lib}` to `{state.new_lib}`.\n\nCode:\n{content}"}
             ]
 
-            # Simple loop per file
-            for attempt in range(2):
+            edited_this_file = False
+            # Keep iterating until the model performs an edit or we hit guard rails.
+            for attempt in range(8):
                 if env.done: break
                 
                 response = client.chat.completions.create(
@@ -234,6 +235,7 @@ def run_agent():
                 messages.append(assistant_msg.model_dump(exclude_none=True))
 
                 if assistant_msg.tool_calls:
+                    saw_non_edit_tool = False
                     for tool_call in assistant_msg.tool_calls:
                         fn_name = tool_call.function.name
                         fn_args = json.loads(tool_call.function.arguments)
@@ -250,6 +252,7 @@ def run_agent():
                             
                             rewards_list.append(reward)
                             final_score = reward
+                            edited_this_file = True
                             
                             log_step(global_step, f"edit:{file_path}", reward, done, None)
                             
@@ -257,8 +260,57 @@ def run_agent():
                                 messages.append({"role": "user", "content": f"Tests failed. Output: {info.get('test_result', {}).get('output', '')[:500]}"})
                             break
                         else:
+                            saw_non_edit_tool = True
                             res = dispatch_tool(fn_name, fn_args, repo_dir=env._work_repo)
                             messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": res})
+
+                    if edited_this_file:
+                        break
+                    if saw_non_edit_tool:
+                        continue
+                else:
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            "You must now call edit_file with the full migrated Python file content. "
+                            "Do not ask questions."
+                        ),
+                    })
+
+            if not edited_this_file and not env.done and global_step < MAX_STEPS:
+                # Last-resort: force an edit_file tool call so the episode can progress.
+                forced = client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=messages,
+                    tools=TOOLS,
+                    tool_choice={"type": "function", "function": {"name": "edit_file"}},
+                    temperature=0.0,
+                )
+                forced_msg = forced.choices[0].message
+                messages.append(forced_msg.model_dump(exclude_none=True))
+
+                if forced_msg.tool_calls:
+                    for tool_call in forced_msg.tool_calls:
+                        if tool_call.function.name != "edit_file":
+                            continue
+                        fn_args = json.loads(tool_call.function.arguments)
+                        new_code = fn_args.get("new_code", "").strip() or content
+                        if "```" in new_code:
+                            new_code = new_code.split("```")[1].replace("python", "").strip()
+
+                        global_step += 1
+                        action = MigrationAction(file_path=file_path, new_code=new_code)
+                        obs, reward, done, info = env.step(action)
+                        rewards_list.append(reward)
+                        final_score = reward
+                        log_step(global_step, f"edit:{file_path}", reward, done, None)
+                        edited_this_file = True
+                        if reward < 1.0:
+                            messages.append({"role": "user", "content": f"Tests failed. Output: {info.get('test_result', {}).get('output', '')[:500]}"})
+                        break
+
+            if not edited_this_file:
+                debug_log(f"No edit_file call produced for {file_path}; skipping file.")
 
         success = final_score >= 0.9  # Define your success criteria
 

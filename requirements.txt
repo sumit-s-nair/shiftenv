@@ -1,9 +1,0 @@
-openenv-core
-pytest
-requests
-httpx
-openai
-pydantic
-python-dotenv
-torch
-flask

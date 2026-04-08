@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-inference.py — Tool-calling agent for ShiftEnv (OpenEnv hackathon).
-Updated to comply with mandatory STDOUT format rules.
+inference.py — Tool-calling ShiftEnv agent.
+
+This script emits mandatory structured logs:
+    [START] task=<task_name> env=<benchmark> model=<model_name>
+    [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
+    [END]   success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...>
 """
 
-import argparse
 import json
 import os
 import sys
-import time
-import textwrap
 from typing import List, Optional
 
 from dotenv import load_dotenv
@@ -31,9 +32,11 @@ API_BASE_URL = os.getenv("API_BASE_URL") or "https://api.openai.com/v1"
 MODEL_NAME = os.getenv("MODEL_NAME") or "gpt-4o-mini"
 HF_TOKEN = os.getenv("HF_TOKEN") or ""
 TASK_NAME = os.getenv("OPENENV_TASK", "medium")
-BENCHMARK = os.getenv("MY_ENV_BENCHMARK", "shiftenv_v1") # Adjust as needed
+BENCHMARK = os.getenv("MY_ENV_BENCHMARK", "shiftenv_v1")
 MAX_STEPS = 10
 KEEP_WORKDIR = False
+SUCCESS_SCORE_THRESHOLD = 0.90
+TOOL_LOOP_LIMIT = 8
 
 # ---------------------------------------------------------
 # Mandatory Logging Format (STDOUT)
@@ -53,7 +56,7 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
 
 def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
+    print(f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}", flush=True)
 
 # Debug logging to STDERR (Validator ignores stderr)
 def debug_log(msg: str):
@@ -64,6 +67,8 @@ def debug_log(msg: str):
 # ---------------------------------------------------------
 def create_client() -> OpenAI:
     api_key = os.environ.get("OPENAI_API_KEY") or HF_TOKEN
+    if not api_key:
+        raise EnvironmentError("Missing API key: set HF_TOKEN or OPENAI_API_KEY")
     return OpenAI(api_key=api_key, base_url=API_BASE_URL)
 
 TOOLS = [
@@ -169,6 +174,23 @@ def dispatch_tool(tool_name: str, args: dict, repo_dir: str = ".") -> str:
         return json.dumps({"error": str(e)})
     return "Unknown tool"
 
+
+def _sanitize_generated_code(new_code: str, fallback: str) -> str:
+    code = (new_code or "").strip()
+    if "```" in code:
+        # Keep behavior tolerant to markdown-fenced outputs.
+        parts = code.split("```")
+        if len(parts) >= 2:
+            code = parts[1].replace("python", "", 1).strip()
+    return code or fallback
+
+
+def _compute_episode_score(rewards: List[float]) -> float:
+    if not rewards:
+        return 0.0
+    raw_score = sum(rewards) / len(rewards)
+    return max(0.0, min(1.0, round(raw_score, 4)))
+
 # ---------------------------------------------------------
 # Agent Logic
 # ---------------------------------------------------------
@@ -189,19 +211,20 @@ def identify_files_to_migrate(context: str, old_lib: str) -> list[str]:
             if current_file not in files: files.append(current_file)
     return files
 
-def run_agent():
+
+def run_task(task_name: str) -> None:
     env = MigrationEnv(max_steps=MAX_STEPS)
-    obs = env.reset(task_name=TASK_NAME)
-    
+
     # Global tracking for [END] log
     rewards_list = []
     global_step = 0
     success = False
     final_score = 0.0
 
-    log_start(TASK_NAME, BENCHMARK, MODEL_NAME)
+    log_start(task_name, BENCHMARK, MODEL_NAME)
 
     try:
+        obs = env.reset(task_name=task_name)
         if obs.status == "error":
             raise Exception(f"Env reset failed: {obs.message}")
 
@@ -215,8 +238,12 @@ def run_agent():
             if env.done or global_step >= MAX_STEPS: break
 
             target_file_path = os.path.join(env._work_repo, file_path)
-            with open(target_file_path, "r") as f:
-                content = f.read()
+            try:
+                with open(target_file_path, "r") as f:
+                    content = f.read()
+            except Exception as e:
+                debug_log(f"Could not read {file_path}: {e}")
+                continue
 
             messages = [
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -225,38 +252,52 @@ def run_agent():
 
             edited_this_file = False
             # Keep iterating until the model performs an edit or we hit guard rails.
-            for attempt in range(8):
+            for _ in range(TOOL_LOOP_LIMIT):
                 if env.done: break
-                
-                response = client.chat.completions.create(
-                    model=MODEL_NAME, messages=messages, tools=TOOLS, tool_choice="auto", temperature=0.1
-                )
-                assistant_msg = response.choices[0].message
+
+                try:
+                    response = client.chat.completions.create(
+                        model=MODEL_NAME,
+                        messages=messages,
+                        tools=TOOLS,
+                        tool_choice="auto",
+                        temperature=0.1,
+                    )
+                    assistant_msg = response.choices[0].message
+                except Exception as e:
+                    debug_log(f"Model call failed on {file_path}: {e}")
+                    messages.append({"role": "user", "content": "Proceed with an edit_file tool call now."})
+                    continue
+
                 messages.append(assistant_msg.model_dump(exclude_none=True))
 
                 if assistant_msg.tool_calls:
                     saw_non_edit_tool = False
                     for tool_call in assistant_msg.tool_calls:
                         fn_name = tool_call.function.name
-                        fn_args = json.loads(tool_call.function.arguments)
+                        try:
+                            fn_args = json.loads(tool_call.function.arguments)
+                        except Exception:
+                            fn_args = {}
                         
                         if fn_name == "edit_file":
                             global_step += 1
-                            new_code = fn_args.get("new_code", "").strip()
-                            # Clean markdown if present
-                            if "```" in new_code:
-                                new_code = new_code.split("```")[1].replace("python", "").strip()
-                            
+                            new_code = _sanitize_generated_code(fn_args.get("new_code", ""), fallback=content)
+
                             action = MigrationAction(file_path=file_path, new_code=new_code)
-                            obs, reward, done, info = env.step(action)
-                            
+                            try:
+                                obs, reward, done, info = env.step(action)
+                            except Exception as e:
+                                log_step(global_step, f"edit:{file_path}", 0.0, True, str(e))
+                                raise
+
                             rewards_list.append(reward)
-                            final_score = reward
+                            final_score = _compute_episode_score(rewards_list)
                             edited_this_file = True
                             
                             log_step(global_step, f"edit:{file_path}", reward, done, None)
                             
-                            if reward < 1.0:
+                            if reward < 0.99:
                                 messages.append({"role": "user", "content": f"Tests failed. Output: {info.get('test_result', {}).get('output', '')[:500]}"})
                             break
                         else:
@@ -279,47 +320,62 @@ def run_agent():
 
             if not edited_this_file and not env.done and global_step < MAX_STEPS:
                 # Last-resort: force an edit_file tool call so the episode can progress.
-                forced = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=messages,
-                    tools=TOOLS,
-                    tool_choice={"type": "function", "function": {"name": "edit_file"}},
-                    temperature=0.0,
-                )
-                forced_msg = forced.choices[0].message
-                messages.append(forced_msg.model_dump(exclude_none=True))
+                try:
+                    forced = client.chat.completions.create(
+                        model=MODEL_NAME,
+                        messages=messages,
+                        tools=TOOLS,
+                        tool_choice={"type": "function", "function": {"name": "edit_file"}},
+                        temperature=0.0,
+                    )
+                    forced_msg = forced.choices[0].message
+                    messages.append(forced_msg.model_dump(exclude_none=True))
+                except Exception as e:
+                    debug_log(f"Forced edit_file call failed on {file_path}: {e}")
+                    forced_msg = None
 
-                if forced_msg.tool_calls:
+                if forced_msg and forced_msg.tool_calls:
                     for tool_call in forced_msg.tool_calls:
                         if tool_call.function.name != "edit_file":
                             continue
-                        fn_args = json.loads(tool_call.function.arguments)
-                        new_code = fn_args.get("new_code", "").strip() or content
-                        if "```" in new_code:
-                            new_code = new_code.split("```")[1].replace("python", "").strip()
+                        try:
+                            fn_args = json.loads(tool_call.function.arguments)
+                        except Exception:
+                            fn_args = {}
+                        new_code = _sanitize_generated_code(fn_args.get("new_code", ""), fallback=content)
 
                         global_step += 1
                         action = MigrationAction(file_path=file_path, new_code=new_code)
                         obs, reward, done, info = env.step(action)
                         rewards_list.append(reward)
-                        final_score = reward
+                        final_score = _compute_episode_score(rewards_list)
                         log_step(global_step, f"edit:{file_path}", reward, done, None)
                         edited_this_file = True
-                        if reward < 1.0:
+                        if reward < 0.99:
                             messages.append({"role": "user", "content": f"Tests failed. Output: {info.get('test_result', {}).get('output', '')[:500]}"})
                         break
 
             if not edited_this_file:
                 debug_log(f"No edit_file call produced for {file_path}; skipping file.")
 
-        success = final_score >= 0.9  # Define your success criteria
+        final_score = _compute_episode_score(rewards_list)
+        success = final_score >= SUCCESS_SCORE_THRESHOLD
 
     except Exception as e:
         debug_log(f"Critical Failure: {e}")
     finally:
+        final_score = _compute_episode_score(rewards_list)
         # Mandatory: Always emit [END]
         log_end(success, global_step, final_score, rewards_list)
-        if not KEEP_WORKDIR: env.cleanup()
+        if not KEEP_WORKDIR:
+            try:
+                env.cleanup()
+            except Exception as e:
+                debug_log(f"Cleanup error: {e}")
+
+
+def run_agent() -> None:
+    run_task(TASK_NAME)
 
 if __name__ == "__main__":
     run_agent()

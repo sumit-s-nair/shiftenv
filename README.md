@@ -1,3 +1,12 @@
+---
+title: openENV-agent
+emoji: 🤖
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
 # ShiftEnv
 
 An [OpenEnv](https://github.com/meta-pytorch/OpenEnv) RL environment where an AI agent migrates Python repositories from one library to another.
@@ -6,7 +15,7 @@ An [OpenEnv](https://github.com/meta-pytorch/OpenEnv) RL environment where an AI
 
 ## How It Works
 
-Give the agent a old library and it will rewrite it to the new one
+Give the agent an old library and it rewrites the repo to the new one.
 
 ## Setup
 
@@ -40,9 +49,9 @@ OPENENV_TASK=hard python inference.py
 reward = 0.7 * test_pass_rate + 0.3 * import_cleanliness - step_penalty
 ```
 
-- **test_pass_rate** (0.0–1.0): Fraction of grader tests passing
-- **import_cleanliness** (0.0 or 1.0): 1.0 if old library fully removed
-- **step_penalty**: `0.01 × (current_step / max_steps)` — encourages efficiency
+- **test_pass_rate** (0.0-1.0): Fraction of grader tests passing
+- **import_cleanliness** (0.0 or 1.0): 1.0 if old library is fully removed
+- **step_penalty**: `0.01 * (current_step / max_steps)` to encourage efficiency
 
 ## Tools
 

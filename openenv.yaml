@@ -12,15 +12,15 @@ tasks:
   easy:
     description: "Migrate crypto utilities from random to secrets"
     difficulty: easy
-    grader: "tasks.easy.tests.grader:grader"
+    grader: "graders.easy_grader"
   medium:
     description: "Migrate HTTP client from requests to httpx"
     difficulty: medium
-    grader: "tasks.medium.tests.grader:grader"
+    grader: "graders.medium_grader"
   hard:
     description: "Migrate test suite from unittest to pytest"
     difficulty: hard
-    grader: "tasks.hard.tests.grader:grader"
+    grader: "graders.hard_grader"
 
 environment:
   entry_point: inference.py

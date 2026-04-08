@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic>=2.0
+numpy
+networkx
+openai
+httpx
+python-dotenv
+openenv-core>=0.2.0
+jsonify

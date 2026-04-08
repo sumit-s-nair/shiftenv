@@ -1,0 +1,25 @@
+spec_version: 1
+name: code-migration-v1
+type: space
+runtime: fastapi
+app: app:app
+port: 7860
+tasks:
+  - id: task_easy
+    name: Easy Migration (requests to httpx)
+    description: Migrate 2 simple synchronous functions with high API similarity.
+    grader:
+      endpoint: /grader
+      score_range: [0.02, 0.98]
+  - id: task_medium
+    name: Medium Migration (sqlite3 to sqlalchemy)
+    description: Migrate 4 functions involving a shift from raw SQL to an ORM/Core pattern.
+    grader:
+      endpoint: /grader
+      score_range: [0.02, 0.98]
+  - id: task_hard
+    name: Hard Migration (sync to async httpx)
+    description: Migrate 6 functions requiring structural changes for asynchronous execution.
+    grader:
+      endpoint: /grader
+      score_range: [0.02, 0.98]

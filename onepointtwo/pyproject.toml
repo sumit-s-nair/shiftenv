@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "code-migration-v1"
+version = "1.0.0"
+description = "Library migration environment for AI agents using Tavily MCP lookup"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic>=2.0",
+    "numpy",
+    "networkx",
+    "openai",
+    "httpx",
+    "python-dotenv",
+    "openenv-core>=0.2.0",
+    "jsonify"
+]
+
+[project.scripts]
+server = "server.app:main"
+

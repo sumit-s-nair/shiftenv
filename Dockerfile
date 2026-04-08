@@ -18,4 +18,4 @@ RUN chmod +x inference.py
 
 ENV PYTHONUNBUFFERED=1
 
-ENTRYPOINT ["python3", "server/app.py"]
+CMD ["python3", "server/app.py"]

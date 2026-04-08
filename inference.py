@@ -18,7 +18,7 @@ from openai import OpenAI
 load_dotenv()
 
 # Environment imports
-from env import MigrationEnv, MigrationAction
+from server.app import MigrationEnv, MigrationAction
 from tools.lib_inspect import get_equivalent_func
 from tools.func_diff import get_func_diff, format_diff_for_agent
 from tools.sandbox import pip_install

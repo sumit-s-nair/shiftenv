@@ -1,6 +1,7 @@
 # env.py — OpenEnv-compliant MigrationEnv
 # Uses Pydantic BaseModel for typed actions/observations/state.
 
+
 import json
 import os
 import re
@@ -13,9 +14,8 @@ from pydantic import BaseModel, Field
 from tools.sandbox import run_tests
 
 
-# ---------------------------------------------------------
-# 1. Pydantic Models (OpenEnv compliant)
-# ---------------------------------------------------------
+
+
 class MigrationAction(BaseModel):
     """An action the agent takes: write new code to a file."""
     file_path: str = Field(description="Relative path to the file to edit within the repo")

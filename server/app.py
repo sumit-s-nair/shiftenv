@@ -396,7 +396,10 @@ def state():
     current_state = env.state
     return jsonify(current_state.model_dump()), 200
 
-if __name__ == "__main__":
-
+def main():
     port = int(os.environ.get("PORT", 7860))
     app.run(host="0.0.0.0", port=port)
+
+
+if __name__ == "__main__":
+    main()

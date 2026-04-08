@@ -21,3 +21,6 @@ testpaths = ["tasks"]
 
 [tool.setuptools]
 packages = ["tools", "tasks"] # Ensure tasks/ folders are copied into the environment
+
+[project.scripts]
+server = "server.app:main"
